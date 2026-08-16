@@ -1,0 +1,442 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内容管理后台 · 深圳遛娃</title>
+<style>
+  :root { --green:#2f9e6e; --green-dark:#1f7a52; --green-light:#e8f5ee; --text:#2d3436; --text-light:#636e72; --bg:#f4f9f6; --card:#fff; --border:#d5e8dd; --danger:#d63031; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); font-size:14px; line-height:1.6; }
+  header { background:linear-gradient(135deg,#2f9e6e,#26a69a); color:#fff; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; position:sticky; top:0; z-index:50; flex-wrap:wrap; }
+  header h1 { font-size:17px; }
+  .header-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .btn { border:none; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; transition:.2s; }
+  .btn-green { background:#fff; color:var(--green-dark); font-weight:600; }
+  .btn-green:hover { background:var(--green-light); }
+  .btn-solid { background:var(--green); color:#fff; font-weight:600; }
+  .btn-solid:hover { background:var(--green-dark); }
+  .btn-danger { background:#fdeeee; color:var(--danger); }
+  .btn-danger:hover { background:#fbdcdc; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .container { display:grid; grid-template-columns:300px 1fr; gap:16px; padding:16px; max-width:1200px; margin:0 auto; align-items:start; }
+  .panel { background:var(--card); border-radius:12px; box-shadow:0 4px 14px rgba(31,122,82,.08); overflow:hidden; }
+  .panel-head { padding:12px 14px; border-bottom:1px solid #eef4f0; font-weight:600; color:var(--green-dark); display:flex; align-items:center; justify-content:space-between; }
+  .list-wrap { max-height:calc(100vh - 150px); overflow-y:auto; }
+  .list-item { padding:11px 14px; border-bottom:1px solid #f0f5f2; cursor:pointer; display:flex; align-items:center; gap:8px; }
+  .list-item:hover { background:var(--green-light); }
+  .list-item.active { background:var(--green-light); border-left:3px solid var(--green); }
+  .list-item .emo { font-size:16px; }
+  .list-item .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .list-item .del { color:var(--text-light); font-size:12px; padding:2px 6px; border-radius:6px; }
+  .list-item .del:hover { background:#fdeeee; color:var(--danger); }
+  .search { width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; outline:none; margin-bottom:8px; }
+  .editor { padding:16px; }
+  .editor .empty { text-align:center; color:var(--text-light); padding:50px 10px; }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field { display:flex; flex-direction:column; gap:4px; }
+  .field.full { grid-column:1/-1; }
+  .field label { font-size:12px; color:var(--text-light); font-weight:600; }
+  .field input, .field textarea, .field select { border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; outline:none; }
+  .field input:focus, .field textarea:focus { border-color:var(--green); }
+  .field textarea { resize:vertical; min-height:60px; }
+  .img-preview { max-width:100%; max-height:160px; border-radius:8px; border:1px solid var(--border); margin-top:4px; }
+  .actions { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .token-bar { display:flex; gap:8px; align-items:center; }
+  .token-bar input { border:1px solid rgba(255,255,255,.6); border-radius:8px; padding:7px 10px; font-size:12px; width:220px; background:rgba(255,255,255,.15); color:#fff; outline:none; }
+  .token-bar input::placeholder { color:rgba(255,255,255,.7); }
+  .hint { font-size:12px; color:var(--text-light); margin-top:8px; line-height:1.6; }
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#333; color:#fff; padding:10px 18px; border-radius:999px; font-size:13px; opacity:0; pointer-events:none; transition:.3s; z-index:99; max-width:90%; text-align:center; }
+  #toast.show { opacity:1; }
+  @media (max-width:760px) {
+    .container { grid-template-columns:1fr; }
+    .form-grid { grid-template-columns:1fr; }
+    .list-wrap { max-height:280px; }
+    .token-bar input { width:150px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛠️ 深圳遛娃 · 内容管理后台</h1>
+  <div class="header-actions">
+    <div class="token-bar">
+      <input id="tokenInput" type="password" placeholder="粘贴 GitHub 令牌 (ghp_...)" autocomplete="off">
+      <button class="btn btn-green" id="saveTokenBtn">保存令牌</button>
+    </div>
+    <a href="../" style="color:#fff;font-size:13px;">← 返回网站</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="panel">
+    <div class="panel-head">
+      <span>🏞️ 公园列表（<span id="pcount">0</span>）</span>
+      <button class="btn btn-solid" id="addBtn" style="padding:5px 10px;font-size:12px;">+ 新增</button>
+    </div>
+    <div style="padding:10px 14px 0;">
+      <input class="search" id="searchBox" type="search" placeholder="搜索公园名称…">
+    </div>
+    <div class="list-wrap" id="parkList"></div>
+  </div>
+
+  <div class="panel">
+    <div class="editor" id="editor">
+      <div class="empty" id="emptyTip">👈 点击左侧公园进行编辑，或点「+ 新增」添加公园</div>
+      <div id="formWrap" style="display:none;">
+        <div class="form-grid">
+          <div class="field"><label>名称 *</label><input id="f_name" placeholder="如：深圳市儿童公园"></div>
+          <div class="field"><label>图标 (emoji)</label><input id="f_emoji" placeholder="🐘"></div>
+          <div class="field"><label>类型标签</label><input id="f_tagLabel" placeholder="公园 · 免费"></div>
+          <div class="field"><label>筛选标签（逗号分隔）</label><input id="f_tags" placeholder="公园,免费,罗湖"></div>
+          <div class="field full"><label>简介 *</label><textarea id="f_intro" rows="3"></textarea></div>
+          <div class="field full"><label>亮点（可留空）</label><textarea id="f_highlights" rows="2"></textarea></div>
+          <div class="field full"><label>地址 *</label><input id="f_address"></div>
+          <div class="field full"><label>地铁 *</label><input id="f_metro"></div>
+          <div class="field full"><label>门票 *</label><input id="f_ticket"></div>
+          <div class="field full"><label>备注（可留空，会显示在卡片上）</label><textarea id="f_notes" rows="2"></textarea></div>
+          <div class="field full">
+            <label>图片（可粘贴图片网址，或上传本地图片）</label>
+            <input id="f_image" placeholder="https://... 或 /images/xxx.jpg">
+            <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
+              <button class="btn btn-green" id="uploadBtn" style="padding:6px 12px;font-size:12px;">📤 上传本地图片</button>
+              <input type="file" id="fileInput" accept="image/*" style="display:none;">
+              <span id="uploadStatus" style="font-size:12px;color:var(--text-light);"></span>
+            </div>
+            <img class="img-preview" id="imgPreview" alt="图片预览" style="display:none;">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-solid" id="saveBtn">💾 保存到 GitHub（自动上线）</button>
+          <button class="btn btn-danger" id="delBtn">🗑️ 删除此公园</button>
+          <button class="btn btn-green" id="resetBtn">撤销修改</button>
+        </div>
+        <div class="hint">💡 保存后 GitHub Pages 会自动重新构建，约 1–2 分钟后网站更新生效。令牌仅保存在你的浏览器本地（localStorage）。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ===== ???? ? ?????? =====
+   ?? GitHub API ???? parks.json / ???????? GitHub Pages ?????????
+   ????????? localStorage???????????? */
+(function () {
+  'use strict';
+  var REPO = 'ah64xy/shenzhen-kids-parks';
+  var BRANCH = 'main';
+  var API = 'https://api.github.com';
+  var RAW = 'https://raw.githubusercontent.com/' + REPO + '/' + BRANCH;
+  var TOKEN_KEY = 'gh_token_v1';
+
+  var state = { parks: [], current: -1, isNew: false };
+  var $ = function (id) { return document.getElementById(id); };
+  var tokenInput = $('tokenInput'), saveTokenBtn = $('saveTokenBtn'), addBtn = $('addBtn');
+  var searchBox = $('searchBox'), parkList = $('parkList'), pcount = $('pcount');
+  var emptyTip = $('emptyTip'), formWrap = $('formWrap');
+  var saveBtn = $('saveBtn'), delBtn = $('delBtn'), resetBtn = $('resetBtn');
+  var uploadBtn = $('uploadBtn'), fileInput = $('fileInput'), uploadStatus = $('uploadStatus');
+  var imgPreview = $('imgPreview'), toastEl = $('toast');
+
+  function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
+  function setToken(t) { if (t) { localStorage.setItem(TOKEN_KEY, t); } else { localStorage.removeItem(TOKEN_KEY); } }
+
+  function toast(msg, ms) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { toastEl.classList.remove('show'); }, ms || 2600);
+  }
+  function authHeaders() {
+    var h = { 'Accept': 'application/vnd.github+json' };
+    var t = getToken();
+    if (t) { h['Authorization'] = 'Bearer ' + t; }
+    return h;
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function utf8ToBase64(str) {
+    var bytes = new TextEncoder().encode(str);
+    var bin = '', chunk = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(bin);
+  }
+
+  /* ---------- ???? ---------- */
+  function loadLocalFallback() {
+    return fetch('../parks.json', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+  }
+  function loadData() {
+    return fetch(RAW + '/parks.json?t=' + Date.now(), { cache: 'no-store', headers: authHeaders() })
+      .then(function (r) {
+        if (r.ok) { return r.json(); }
+        return loadLocalFallback();
+      })
+      .then(function (data) {
+        if (!data || !Array.isArray(data.parks)) { throw new Error('bad data'); }
+        state.parks = data.parks;
+        state.current = -1; state.isNew = false;
+        renderList(); showEmpty();
+        toast('??? ' + state.parks.length + ' ???');
+        return true;
+      })
+      .catch(function () {
+        return loadLocalFallback().then(function (data) {
+          if (data && Array.isArray(data.parks)) {
+            state.parks = data.parks;
+            state.current = -1; state.isNew = false;
+            renderList(); showEmpty();
+            toast('?????????', 3000);
+            return true;
+          }
+          toast('????????????????????????? GitHub ??');
+          return false;
+        });
+      });
+  }
+  function showEmpty() { formWrap.style.display = 'none'; emptyTip.style.display = 'block'; }
+  function showForm() { formWrap.style.display = 'block'; emptyTip.style.display = 'none'; }
+
+  /* ---------- ???? ---------- */
+  function renderList() {
+    var kw = searchBox.value.trim().toLowerCase();
+    var html = '';
+    state.parks.forEach(function (p, idx) {
+      var nm = p.name || '?????';
+      if (kw && nm.toLowerCase().indexOf(kw) === -1) { return; }
+      var active = idx === state.current ? ' active' : '';
+      html += '<div class="list-item' + active + '" data-idx="' + idx + '">'
+        + '<span class="emo">' + esc(p.emoji || '??') + '</span>'
+        + '<span class="nm">' + esc(nm) + '</span>'
+        + '<span class="del" data-del="' + idx + '" title="??">?</span>'
+        + '</div>';
+    });
+    parkList.innerHTML = html || '<div style="padding:20px;text-align:center;color:#999;">???????</div>';
+    pcount.textContent = state.parks.length;
+  }
+  parkList.addEventListener('click', function (e) {
+    var del = e.target.closest('[data-del]');
+    if (del) { e.stopPropagation(); deletePark(+del.getAttribute('data-del')); return; }
+    var item = e.target.closest('[data-idx]');
+    if (item) { selectPark(+item.getAttribute('data-idx')); }
+  });
+
+  /* ---------- ?? / ?? ---------- */
+  function selectPark(idx) {
+    if (state.isNew && state.current > -1 && idx !== state.current) {
+      state.parks.splice(state.current, 1); // ?????????
+    }
+    var p = state.parks[idx];
+    state.current = idx; state.isNew = false;
+    fillForm(p); renderList();
+  }
+  function fillForm(p) {
+    $('f_name').value = p.name || '';
+    $('f_emoji').value = p.emoji || '';
+    $('f_tagLabel').value = p.tagLabel || '';
+    $('f_tags').value = (p.tags || []).join(',');
+    $('f_intro').value = p.intro || '';
+    $('f_highlights').value = p.highlights || '';
+    $('f_address').value = p.address || '';
+    $('f_metro').value = p.metro || '';
+    $('f_ticket').value = p.ticket || '';
+    $('f_notes').value = p.notes || '';
+    $('f_image').value = p.image || '';
+    updatePreview(p.image || '');
+    showForm();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function collectForm() {
+    var p = state.parks[state.current];
+    if (!p) { return null; }
+    p.name = $('f_name').value.trim();
+    p.emoji = $('f_emoji').value.trim();
+    p.tagLabel = $('f_tagLabel').value.trim();
+    p.tags = $('f_tags').value.split(/[,?]/).map(function (s) { return s.trim(); }).filter(Boolean);
+    p.intro = $('f_intro').value.trim();
+    p.highlights = $('f_highlights').value.trim();
+    p.address = $('f_address').value.trim();
+    p.metro = $('f_metro').value.trim();
+    p.ticket = $('f_ticket').value.trim();
+    p.notes = $('f_notes').value.trim();
+    p.image = $('f_image').value.trim();
+    return p;
+  }
+  addBtn.addEventListener('click', function () {
+    if (state.isNew && state.current > -1) { state.parks.splice(state.current, 1); }
+    var p = { name: '', emoji: '??', tagLabel: '?? ? ??', tags: ['??', '??'], intro: '', highlights: '', address: '', metro: '', ticket: '??', image: '', notes: '' };
+    state.parks.push(p);
+    state.current = state.parks.length - 1;
+    state.isNew = true;
+    fillForm(p); renderList();
+    toast('?????????????? GitHub?');
+  });
+
+  /* ---------- ?? / ?? ---------- */
+  async function saveAllToGitHub(message) {
+    var content = utf8ToBase64(JSON.stringify({ parks: state.parks }, null, 2));
+    var body = { message: message, content: content, branch: BRANCH };
+    var metaRes = await fetch(API + '/repos/' + REPO + '/contents/parks.json', { headers: authHeaders() });
+    if (metaRes.ok) { body.sha = (await metaRes.json()).sha; }
+    var res = await fetch(API + '/repos/' + REPO + '/contents/parks.json', {
+      method: 'PUT',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      var msg = '???? (HTTP ' + res.status + ')';
+      if (res.status === 401 || res.status === 403) { msg += '???????????????? GitHub ??'; }
+      throw new Error(msg);
+    }
+    return true;
+  }
+  saveBtn.addEventListener('click', function () {
+    if (!getToken()) { toast('???? GitHub ??'); return; }
+    var p = collectForm();
+    if (!p) { return; }
+    if (!p.name) { toast('???????'); return; }
+    if (!p.intro) { toast('?????'); return; }
+    saveBtn.disabled = true; saveBtn.textContent = '????';
+    saveAllToGitHub('???????' + p.name)
+      .then(function () {
+        state.isNew = false;
+        toast('? ????GitHub Pages ? 1?2 ???????');
+      })
+      .catch(function (err) {
+        toast('? ' + (err && err.message ? err.message : '??????????'));
+      })
+      .finally(function () {
+        saveBtn.disabled = false; saveBtn.textContent = '??? GitHub??????';
+      });
+  });
+  function deletePark(idx) {
+    var p = state.parks[idx];
+    if (!p) { return; }
+    if (!confirm('?????' + (p.name || '???') + '???????????')) { return; }
+    var wasNew = state.isNew && state.current === idx;
+    state.parks.splice(idx, 1);
+    state.current = -1; state.isNew = false;
+    renderList(); showEmpty();
+    if (wasNew || !getToken()) { if (!getToken()) { toast('???? GitHub ??'); } return; }
+    saveAllToGitHub('?????' + (p.name || ''))
+      .then(function () { toast('? ??????'); })
+      .catch(function (err) { toast('? ' + (err && err.message ? err.message : '????')); });
+  }
+  delBtn.addEventListener('click', function () {
+    if (state.current < 0) { return; }
+    deletePark(state.current);
+  });
+  resetBtn.addEventListener('click', function () {
+    if (!confirm('?????????????? GitHub ???')) { return; }
+    loadData().then(function () { toast('?????????'); });
+  });
+
+  /* ---------- ???? ---------- */
+  function compressImage(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onload = function () {
+          var MAX = 1280, w = img.width, h = img.height;
+          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = function () { reject(new Error('??????')); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function () { reject(new Error('??????')); };
+      reader.readAsDataURL(file);
+    });
+  }
+  async function putBinary(path, base64, message) {
+    var body = { message: message, content: base64, branch: BRANCH };
+    var metaRes = await fetch(API + '/repos/' + REPO + '/contents/' + path, { headers: authHeaders() });
+    if (metaRes.ok) { body.sha = (await metaRes.json()).sha; }
+    var res = await fetch(API + '/repos/' + REPO + '/contents/' + path, {
+      method: 'PUT',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) { throw new Error('HTTP ' + res.status); }
+    return true;
+  }
+  uploadBtn.addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files[0];
+    if (!file) { return; }
+    if (!getToken()) { toast('???? GitHub ??'); return; }
+    uploadStatus.textContent = '????';
+    compressImage(file)
+      .then(function (dataUrl) {
+        var base64 = dataUrl.split(',')[1];
+        var path = 'images/img_' + Date.now() + '.jpg';
+        return putBinary(path, base64, '???? ' + file.name).then(function () { return path; });
+      })
+      .then(function (path) {
+        $('f_image').value = path;
+        updatePreview(path);
+        uploadStatus.textContent = '? ????' + path;
+        toast('???????????????');
+      })
+      .catch(function (err) {
+        uploadStatus.textContent = '';
+        toast('? ?????' + (err && err.message ? err.message : '?????/??'));
+      })
+      .finally(function () { fileInput.value = ''; });
+  });
+
+  /* ---------- ???? ---------- */
+  function updatePreview(src) {
+    if (!src) { imgPreview.style.display = 'none'; imgPreview.src = ''; return; }
+    var url = src;
+    if (src.indexOf('images/') === 0 || src.indexOf('./') === 0) { url = RAW + '/' + src.replace(/^\.\//, ''); }
+    imgPreview.src = url;
+    imgPreview.style.display = 'block';
+  }
+  $('f_image').addEventListener('input', function () { updatePreview($('f_image').value); });
+
+  /* ---------- ?? ---------- */
+  saveTokenBtn.addEventListener('click', function () {
+    var t = tokenInput.value.trim();
+    if (!t) { toast('?????'); return; }
+    setToken(t);
+    toast('? ???????????');
+    loadData();
+  });
+  tokenInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { saveTokenBtn.click(); } });
+  (function addClearBtn() {
+    var b = document.createElement('button');
+    b.className = 'btn btn-green';
+    b.textContent = '??';
+    b.style.cssText = 'padding:6px 10px;font-size:12px;';
+    b.addEventListener('click', function () {
+      if (confirm('??????????')) {
+        setToken(''); tokenInput.value = '';
+        toast('?????');
+      }
+    });
+    document.querySelector('.token-bar').appendChild(b);
+  })();
+
+  /* ---------- ??? ---------- */
+  searchBox.addEventListener('input', renderList);
+  var saved = getToken();
+  if (saved) { tokenInput.value = saved; }
+  loadData().catch(function () {});
+})();
+</script>
+</body>
+</html>
