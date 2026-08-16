@@ -121,9 +121,9 @@
 <div id="toast"></div>
 
 <script>
-/* ===== ???? ? ?????? =====
-   ?? GitHub API ???? parks.json / ???????? GitHub Pages ?????????
-   ????????? localStorage???????????? */
+/* ===== 深圳遛娃 · 内容管理后台 =====
+   通过 GitHub API 直接编辑 parks.json / 上传图片，保存后 GitHub Pages 自动重新构建上线。
+   令牌仅保存在浏览器 localStorage，不会上传到任何服务器。 */
 (function () {
   'use strict';
   var REPO = 'ah64xy/shenzhen-kids-parks';
@@ -169,7 +169,7 @@
     return btoa(bin);
   }
 
-  /* ---------- ???? ---------- */
+  /* ---------- 数据加载 ---------- */
   function loadLocalFallback() {
     return fetch('../parks.json', { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -186,7 +186,7 @@
         state.parks = data.parks;
         state.current = -1; state.isNew = false;
         renderList(); showEmpty();
-        toast('??? ' + state.parks.length + ' ???');
+        toast('已加载 ' + state.parks.length + ' 个场所');
         return true;
       })
       .catch(function () {
@@ -195,10 +195,10 @@
             state.parks = data.parks;
             state.current = -1; state.isNew = false;
             renderList(); showEmpty();
-            toast('?????????', 3000);
+            toast('已加载本地备份数据', 3000);
             return true;
           }
-          toast('????????????????????????? GitHub ??');
+          toast('无法加载数据：请检查网络，或先在「保存令牌」中粘贴 GitHub 令牌');
           return false;
         });
       });
@@ -206,21 +206,21 @@
   function showEmpty() { formWrap.style.display = 'none'; emptyTip.style.display = 'block'; }
   function showForm() { formWrap.style.display = 'block'; emptyTip.style.display = 'none'; }
 
-  /* ---------- ???? ---------- */
+  /* ---------- 列表渲染 ---------- */
   function renderList() {
     var kw = searchBox.value.trim().toLowerCase();
     var html = '';
     state.parks.forEach(function (p, idx) {
-      var nm = p.name || '?????';
+      var nm = p.name || '（未命名）';
       if (kw && nm.toLowerCase().indexOf(kw) === -1) { return; }
       var active = idx === state.current ? ' active' : '';
       html += '<div class="list-item' + active + '" data-idx="' + idx + '">'
-        + '<span class="emo">' + esc(p.emoji || '??') + '</span>'
+        + '<span class="emo">' + esc(p.emoji || '🎈') + '</span>'
         + '<span class="nm">' + esc(nm) + '</span>'
-        + '<span class="del" data-del="' + idx + '" title="??">?</span>'
+        + '<span class="del" data-del="' + idx + '" title="删除">✕</span>'
         + '</div>';
     });
-    parkList.innerHTML = html || '<div style="padding:20px;text-align:center;color:#999;">???????</div>';
+    parkList.innerHTML = html || '<div style="padding:20px;text-align:center;color:#999;">没有匹配的公园</div>';
     pcount.textContent = state.parks.length;
   }
   parkList.addEventListener('click', function (e) {
@@ -230,10 +230,10 @@
     if (item) { selectPark(+item.getAttribute('data-idx')); }
   });
 
-  /* ---------- ?? / ?? ---------- */
+  /* ---------- 选中 / 表单 ---------- */
   function selectPark(idx) {
     if (state.isNew && state.current > -1 && idx !== state.current) {
-      state.parks.splice(state.current, 1); // ?????????
+      state.parks.splice(state.current, 1); // 丢弃未保存的新公园
     }
     var p = state.parks[idx];
     state.current = idx; state.isNew = false;
@@ -261,7 +261,7 @@
     p.name = $('f_name').value.trim();
     p.emoji = $('f_emoji').value.trim();
     p.tagLabel = $('f_tagLabel').value.trim();
-    p.tags = $('f_tags').value.split(/[,?]/).map(function (s) { return s.trim(); }).filter(Boolean);
+    p.tags = $('f_tags').value.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
     p.intro = $('f_intro').value.trim();
     p.highlights = $('f_highlights').value.trim();
     p.address = $('f_address').value.trim();
@@ -273,15 +273,15 @@
   }
   addBtn.addEventListener('click', function () {
     if (state.isNew && state.current > -1) { state.parks.splice(state.current, 1); }
-    var p = { name: '', emoji: '??', tagLabel: '?? ? ??', tags: ['??', '??'], intro: '', highlights: '', address: '', metro: '', ticket: '??', image: '', notes: '' };
+    var p = { name: '', emoji: '🎈', tagLabel: '公园 · 免费', tags: ['公园', '免费'], intro: '', highlights: '', address: '', metro: '', ticket: '免费', image: '', notes: '' };
     state.parks.push(p);
     state.current = state.parks.length - 1;
     state.isNew = true;
     fillForm(p); renderList();
-    toast('?????????????? GitHub?');
+    toast('已新建：填写内容后点「保存到 GitHub」');
   });
 
-  /* ---------- ?? / ?? ---------- */
+  /* ---------- 保存 / 删除 ---------- */
   async function saveAllToGitHub(message) {
     var content = utf8ToBase64(JSON.stringify({ parks: state.parks }, null, 2));
     var body = { message: message, content: content, branch: BRANCH };
@@ -293,54 +293,54 @@
       body: JSON.stringify(body)
     });
     if (!res.ok) {
-      var msg = '???? (HTTP ' + res.status + ')';
-      if (res.status === 401 || res.status === 403) { msg += '???????????????? GitHub ??'; }
+      var msg = '保存失败 (HTTP ' + res.status + ')';
+      if (res.status === 401 || res.status === 403) { msg += '：令牌无效或权限不足，请重新生成 GitHub 令牌'; }
       throw new Error(msg);
     }
     return true;
   }
   saveBtn.addEventListener('click', function () {
-    if (!getToken()) { toast('???? GitHub ??'); return; }
+    if (!getToken()) { toast('请先粘贴 GitHub 令牌'); return; }
     var p = collectForm();
     if (!p) { return; }
-    if (!p.name) { toast('???????'); return; }
-    if (!p.intro) { toast('?????'); return; }
-    saveBtn.disabled = true; saveBtn.textContent = '????';
-    saveAllToGitHub('???????' + p.name)
+    if (!p.name) { toast('请填写公园名称'); return; }
+    if (!p.intro) { toast('请填写简介'); return; }
+    saveBtn.disabled = true; saveBtn.textContent = '保存中…';
+    saveAllToGitHub('更新公园数据：' + p.name)
       .then(function () {
         state.isNew = false;
-        toast('? ????GitHub Pages ? 1?2 ???????');
+        toast('✅ 已保存！GitHub Pages 约 1–2 分钟后自动更新');
       })
       .catch(function (err) {
-        toast('? ' + (err && err.message ? err.message : '??????????'));
+        toast('❌ ' + (err && err.message ? err.message : '保存失败，请检查令牌'));
       })
       .finally(function () {
-        saveBtn.disabled = false; saveBtn.textContent = '??? GitHub??????';
+        saveBtn.disabled = false; saveBtn.textContent = '保存到 GitHub（自动上线）';
       });
   });
   function deletePark(idx) {
     var p = state.parks[idx];
     if (!p) { return; }
-    if (!confirm('?????' + (p.name || '???') + '???????????')) { return; }
+    if (!confirm('确定删除「' + (p.name || '未命名') + '」吗？删除后不可恢复。')) { return; }
     var wasNew = state.isNew && state.current === idx;
     state.parks.splice(idx, 1);
     state.current = -1; state.isNew = false;
     renderList(); showEmpty();
-    if (wasNew || !getToken()) { if (!getToken()) { toast('???? GitHub ??'); } return; }
-    saveAllToGitHub('?????' + (p.name || ''))
-      .then(function () { toast('? ??????'); })
-      .catch(function (err) { toast('? ' + (err && err.message ? err.message : '????')); });
+    if (wasNew || !getToken()) { if (!getToken()) { toast('请先粘贴 GitHub 令牌'); } return; }
+    saveAllToGitHub('删除公园：' + (p.name || ''))
+      .then(function () { toast('✅ 已删除并发布'); })
+      .catch(function (err) { toast('❌ ' + (err && err.message ? err.message : '删除失败')); });
   }
   delBtn.addEventListener('click', function () {
     if (state.current < 0) { return; }
     deletePark(state.current);
   });
   resetBtn.addEventListener('click', function () {
-    if (!confirm('?????????????? GitHub ???')) { return; }
-    loadData().then(function () { toast('?????????'); });
+    if (!confirm('放弃本地未保存的修改，重新从 GitHub 加载？')) { return; }
+    loadData().then(function () { toast('已重新加载线上数据'); });
   });
 
-  /* ---------- ???? ---------- */
+  /* ---------- 图片上传 ---------- */
   function compressImage(file) {
     return new Promise(function (resolve, reject) {
       var reader = new FileReader();
@@ -354,10 +354,10 @@
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/jpeg', 0.82));
         };
-        img.onerror = function () { reject(new Error('??????')); };
+        img.onerror = function () { reject(new Error('图片解析失败')); };
         img.src = e.target.result;
       };
-      reader.onerror = function () { reject(new Error('??????')); };
+      reader.onerror = function () { reject(new Error('读取文件失败')); };
       reader.readAsDataURL(file);
     });
   }
@@ -377,28 +377,28 @@
   fileInput.addEventListener('change', function () {
     var file = fileInput.files[0];
     if (!file) { return; }
-    if (!getToken()) { toast('???? GitHub ??'); return; }
-    uploadStatus.textContent = '????';
+    if (!getToken()) { toast('请先粘贴 GitHub 令牌'); return; }
+    uploadStatus.textContent = '上传中…';
     compressImage(file)
       .then(function (dataUrl) {
         var base64 = dataUrl.split(',')[1];
         var path = 'images/img_' + Date.now() + '.jpg';
-        return putBinary(path, base64, '???? ' + file.name).then(function () { return path; });
+        return putBinary(path, base64, '上传图片 ' + file.name).then(function () { return path; });
       })
       .then(function (path) {
         $('f_image').value = path;
         updatePreview(path);
-        uploadStatus.textContent = '? ????' + path;
-        toast('???????????????');
+        uploadStatus.textContent = '✅ 已上传：' + path;
+        toast('图片已上传，记得点「保存」发布');
       })
       .catch(function (err) {
         uploadStatus.textContent = '';
-        toast('? ?????' + (err && err.message ? err.message : '?????/??'));
+        toast('❌ 上传失败：' + (err && err.message ? err.message : '请检查令牌/网络'));
       })
       .finally(function () { fileInput.value = ''; });
   });
 
-  /* ---------- ???? ---------- */
+  /* ---------- 图片预览 ---------- */
   function updatePreview(src) {
     if (!src) { imgPreview.style.display = 'none'; imgPreview.src = ''; return; }
     var url = src;
@@ -408,35 +408,36 @@
   }
   $('f_image').addEventListener('input', function () { updatePreview($('f_image').value); });
 
-  /* ---------- ?? ---------- */
+  /* ---------- 令牌 ---------- */
   saveTokenBtn.addEventListener('click', function () {
     var t = tokenInput.value.trim();
-    if (!t) { toast('?????'); return; }
+    if (!t) { toast('请输入令牌'); return; }
     setToken(t);
-    toast('? ???????????');
+    toast('✅ 令牌已保存到本地浏览器');
     loadData();
   });
   tokenInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { saveTokenBtn.click(); } });
   (function addClearBtn() {
     var b = document.createElement('button');
     b.className = 'btn btn-green';
-    b.textContent = '??';
+    b.textContent = '清除';
     b.style.cssText = 'padding:6px 10px;font-size:12px;';
     b.addEventListener('click', function () {
-      if (confirm('??????????')) {
+      if (confirm('清除本地保存的令牌？')) {
         setToken(''); tokenInput.value = '';
-        toast('?????');
+        toast('已清除令牌');
       }
     });
     document.querySelector('.token-bar').appendChild(b);
   })();
 
-  /* ---------- ??? ---------- */
+  /* ---------- 初始化 ---------- */
   searchBox.addEventListener('input', renderList);
   var saved = getToken();
   if (saved) { tokenInput.value = saved; }
   loadData().catch(function () {});
 })();
 </script>
+
 </body>
 </html>
